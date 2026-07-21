@@ -1,3 +1,4 @@
+import re
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -105,6 +106,36 @@ def check_arxiv(title: str, author: str) -> str:
         print(f"arXiv error: {e}")
     return None
 
+def check_arxiv_by_id(arxiv_id: str) -> dict:
+    url = f"http://export.arxiv.org/api/query?id_list={urllib.parse.quote(arxiv_id)}"
+    try:
+        response = session.get(url, timeout=10)
+        if response.status_code == 200:
+            root = ET.fromstring(response.text)
+            entry = root.find('{http://www.w3.org/2005/Atom}entry')
+            if entry is not None:
+                title = entry.find('{http://www.w3.org/2005/Atom}title').text.replace('\\n', ' ')
+                published = entry.find('{http://www.w3.org/2005/Atom}published').text
+                year = published[:4] if published else None
+                authors = [{"family": a.find('{http://www.w3.org/2005/Atom}name').text} for a in entry.findall('{http://www.w3.org/2005/Atom}author')]
+                
+                pdf_url = None
+                for link in entry.findall('{http://www.w3.org/2005/Atom}link'):
+                    if link.attrib.get('title') == 'pdf':
+                        pdf_url = link.attrib.get('href')
+                        break
+                        
+                return {
+                    "title": title,
+                    "year": int(year) if year else None,
+                    "authors": authors,
+                    "open_access_pdf": pdf_url,
+                    "doi": f"10.48550/arXiv.{arxiv_id}"
+                }
+    except Exception as e:
+        print(f"arXiv ID error: {e}")
+    return None
+
 @stage_1_cache.memoize(expire=2592000)
 def run_stage_1_verification(query: str = None, title: str = None, author: str = None) -> dict:
     """
@@ -122,8 +153,23 @@ def run_stage_1_verification(query: str = None, title: str = None, author: str =
     }
     pdf_url = None
     
+    # 0. Check if the query contains an explicit arXiv ID
+    if query:
+        arxiv_match = re.search(r'(?:arxiv:)?(\d{4}\.\d{4,5}(?:v\d+)?)', query.lower())
+        if arxiv_match:
+            arxiv_id = arxiv_match.group(1)
+            arxiv_res = check_arxiv_by_id(arxiv_id)
+            if arxiv_res:
+                verified = True
+                metadata["title"] = arxiv_res["title"]
+                metadata["year"] = arxiv_res["year"]
+                metadata["authors"] = arxiv_res["authors"]
+                metadata["doi"] = arxiv_res["doi"]
+                pdf_url = arxiv_res["open_access_pdf"]
+                
     # 1. Search Semantic Scholar First (Excellent for CS/AI, but prone to rate limits without a key)
-    s2_res = search_semantic_scholar(query, title, author)
+    if not verified:
+        s2_res = search_semantic_scholar(query, title, author)
     if s2_res:
         verified = True
         metadata["title"] = s2_res.get("title", metadata["title"])
