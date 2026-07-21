@@ -30,9 +30,18 @@ limiter = Limiter(
 # Configurable threshold for Stage 2 search results loaded from env
 MIN_SCORE_THRESHOLD = Config.MIN_SCORE_THRESHOLD
 
+from werkzeug.exceptions import HTTPException
+
 @app.errorhandler(Exception)
 def handle_exception(e):
     """Return JSON instead of HTML for HTTP errors and exceptions."""
+    if isinstance(e, HTTPException):
+        return jsonify({
+            "status": "error",
+            "message": e.description,
+            "error": e.name
+        }), e.code
+        
     logger.error(f"Global exception caught: {e}", exc_info=True)
     return jsonify({
         "status": "error",
@@ -46,12 +55,16 @@ def find_paper():
     data = request.json
     
     # Accept either a raw citation string, or structured title/author
-    query = data.get('query')
-    title = data.get('title')
-    author = data.get('author')
+    query = data.get('query', '')
+    title = data.get('title', '')
+    author = data.get('author', '')
     
-    if not (query or (title and author)):
-        return jsonify({"error": "Missing query or title/author parameters"}), 400
+    if query: query = query.strip()
+    if title: title = title.strip()
+    if author: author = author.strip()
+    
+    if not (query or title):
+        return jsonify({"error": "Missing query or title parameter"}), 400
         
     # ==========================================
     # Stage 1: Verification & structured lookup

@@ -99,7 +99,10 @@ def run_stage_2_search(metadata: dict) -> list:
     for q in queries:
         search_results = perform_search(q)
         for res in search_results:
-            url = res['url']
+            url = res.get('url')
+            if not url:
+                continue
+                
             extracted_title = res['title']
             snippet = res['snippet']
             

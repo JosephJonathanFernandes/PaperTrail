@@ -70,10 +70,15 @@ def calculate_confidence(input_query: str, input_title: str, input_author: str, 
     flags = []
     
     api_title = api_metadata.get("title", "")
-    api_authors = " ".join([a.get("family", "") for a in api_metadata.get("authors", [])])
+    api_authors = " ".join([a.get("family", a.get("name", "")) for a in api_metadata.get("authors", [])])
     
     if input_title and api_title:
         title_sim = fuzz.ratio(input_title.lower(), api_title.lower())
+        
+        arxiv_match = re.search(r'(\d{4}\.\d{4,5})', input_title)
+        if arxiv_match and api_metadata.get("doi") and arxiv_match.group(1) in api_metadata.get("doi"):
+            title_sim = 100
+            
         if title_sim < 95:
             score -= (100 - title_sim) * 0.5
             flags.append(f"Title mismatch ({title_sim:.1f}% similarity). Expected: '{input_title}', Found: '{api_title}'")
@@ -105,6 +110,11 @@ def calculate_confidence(input_query: str, input_title: str, input_author: str, 
         tier = "MEDIUM"
     else:
         tier = "LOW"
+        
+    if api_metadata.get("is_retracted"):
+        score = 0
+        tier = "LOW"
+        flags.insert(0, "🚨 RETRACTED PAPER: This paper has been officially retracted. Do not cite.")
         
     return {
         "score": score,
