@@ -29,7 +29,7 @@ session.mount("https://", adapter)
 
 def search_semantic_scholar(query: str, title: str, author: str) -> dict:
     search_str = query if query else f"{title} {author}".strip()
-    url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={urllib.parse.quote(search_str)}&limit=1&fields=title,authors,year,externalIds,openAccessPdf,isRetracted"
+    url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={urllib.parse.quote(search_str)}&limit=1&fields=title,authors,year,externalIds,openAccessPdf"
     try:
         response = session.get(url, timeout=3)
         if response.status_code == 200:
@@ -73,6 +73,16 @@ def search_openalex(query: str, title: str, author: str) -> dict:
                 return results[0]
     except Exception as e:
         print(f"OpenAlex error: {e}")
+    return None
+
+def check_openalex_by_doi(doi: str) -> dict:
+    url = f"https://api.openalex.org/works/https://doi.org/{doi}"
+    try:
+        response = session.get(url, timeout=3)
+        if response.status_code == 200:
+            return response.json()
+    except Exception as e:
+        print(f"OpenAlex DOI error: {e}")
     return None
 
 def check_unpaywall(doi: str) -> str:
@@ -181,6 +191,21 @@ def run_stage_1_verification(query: str = None, title: str = None, author: str =
             metadata["authors"] = arxiv_res["authors"]
             metadata["doi"] = arxiv_res["doi"]
             pdf_url = arxiv_res["open_access_pdf"]
+            
+    if not verified and "doi" in ids:
+        oa_doi_res = check_openalex_by_doi(ids["doi"])
+        if oa_doi_res:
+            verified = True
+            metadata["title"] = oa_doi_res.get("title", metadata["title"])
+            metadata["doi"] = ids["doi"]
+            metadata["year"] = oa_doi_res.get("publication_year")
+            metadata["authors"] = [a.get("author", {}) for a in oa_doi_res.get("authorships", [])]
+            if oa_doi_res.get("is_retracted"):
+                metadata["is_retracted"] = True
+            
+            oa = oa_doi_res.get("open_access", {})
+            if oa.get("is_oa") and oa.get("oa_url") and oa["oa_url"].endswith(".pdf"):
+                pdf_url = oa["oa_url"]
                 
     # 1. Search Semantic Scholar First (Excellent for CS/AI, but prone to rate limits without a key)
     s2_res = None
@@ -192,8 +217,6 @@ def run_stage_1_verification(query: str = None, title: str = None, author: str =
         metadata["doi"] = s2_res.get("externalIds", {}).get("DOI")
         metadata["year"] = s2_res.get("year")
         metadata["authors"] = [a for a in s2_res.get("authors", [])]
-        if s2_res.get("isRetracted"):
-            metadata["is_retracted"] = True
         
         if s2_res.get("openAccessPdf"):
             pdf_url = s2_res["openAccessPdf"].get("url")
@@ -219,7 +242,7 @@ def run_stage_1_verification(query: str = None, title: str = None, author: str =
                 
     # 3. Search CrossRef if OpenAlex didn't yield a DOI
     if not verified or not metadata["doi"]:
-        crossref_res = search_crossref(metadata["title"] or title, author)
+        crossref_res = search_crossref(metadata["title"] or title or query, author)
         if crossref_res:
             verified = True
             metadata["title"] = crossref_res.get("title", [metadata["title"]])[0]

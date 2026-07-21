@@ -1,13 +1,15 @@
 // Listen for messages from background.js
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "showLoading") {
-    injectToast("Verifying citation...", "loading");
-  } else if (request.action === "showResult") {
-    updateToastWithResult(request.payload);
-  } else if (request.action === "showError") {
-    updateToastWithError(request.error);
-  }
-});
+if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "showLoading") {
+      injectToast("Verifying citation...", "loading");
+    } else if (request.action === "showResult") {
+      updateToastWithResult(request.payload);
+    } else if (request.action === "showError") {
+      updateToastWithError(request.error);
+    }
+  });
+}
 
 let currentToast = null;
 

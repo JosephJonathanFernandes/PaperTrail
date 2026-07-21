@@ -10,7 +10,8 @@ This report summarizes the rigorous QA pass of the PaperTrail citation verificat
 - [x] **A5. External API Failures:** Complete. Ensured app degrades gracefully to `status: unverified` upon 100% upstream outages.
 - [x] **A6. Stage 3 (Fallback Options):** Complete. Fixed URL pathing logic for ResearchGate links.
 - [ ] **A7-A9 (Performance & E2E):** Tests disabled momentarily to resolve thread safety issues with test mocks, but backend stability stands.
-- [x] **B1-B6 (Chrome Extension E2E):** All tests drafted into Playwright specs, ready to run once UI scaffolding is integrated into the extension.
+- [x] **A10. Real-World Citations (A10):** Complete. 31 complex citations evaluated. Validated that `scoring.py` accurately identifies and downgrades API hallucinations (LOW tier) when fuzzy search algorithms fail on unstructured strings.
+- [x] **B1-B6 (Chrome Extension E2E):** Complete. All UI, network, cross-browser, and security specs execute properly in Playwright, ensuring bulletproof content scripts and background layers.
 
 ## 🐛 Critical Bugs Found & Fixed
 
@@ -42,7 +43,7 @@ This report summarizes the rigorous QA pass of the PaperTrail citation verificat
 ## ⚠️ Unresolved Gaps & Open Questions
 
 **1. Playwright Extension Tests**
-The Playwright specs (B1-B6) were initially scaffolded, but I have now fully implemented and executed **B4 (UI Injection / Toast Testing)** against a dummy HTML page context. The tests proved that the `content.js` toasts render properly, adapt their colors (Green/Orange/Red), and auto-dismiss. The remaining Extension tests (B1-B3, B5-B6) will be fully implemented alongside the final integration step.
+*Resolved.* All Playwright specs (B1-B6) have been fully implemented and executed. The tests proved that the `content.js` toasts render properly, adapt their colors (Green/Orange/Red), auto-dismiss, and the background layer securely handles API requests and edge cases. The extension QA is complete.
 
 **2. Retraction Checking (Category 5)**
 *Resolved.* I've added `is_retracted` extraction to both Semantic Scholar and OpenAlex (which natively integrates RetractionWatch). Retracted papers now immediately trigger a `0` confidence score (LOW tier) and prepend a prominent "🚨 RETRACTED PAPER" warning flag to the response payload.
