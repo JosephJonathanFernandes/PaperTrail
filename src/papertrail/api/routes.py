@@ -30,6 +30,16 @@ limiter = Limiter(
 # Configurable threshold for Stage 2 search results loaded from env
 MIN_SCORE_THRESHOLD = Config.MIN_SCORE_THRESHOLD
 
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Return JSON instead of HTML for HTTP errors and exceptions."""
+    logger.error(f"Global exception caught: {e}", exc_info=True)
+    return jsonify({
+        "status": "error",
+        "message": "An internal error occurred on the server.",
+        "error": str(e)
+    }), 500
+
 @app.route('/find_paper', methods=['POST'])
 @limiter.limit(Config.API_RATE_LIMIT)
 def find_paper():

@@ -46,20 +46,20 @@ function updateToastWithResult(data) {
   if (data.status === "success") {
     currentToast.className = "papertrail-toast papertrail-success";
     html = `
-      <strong>✅ ${data.metadata.title || "Paper Found"}</strong><br>
+      <strong>\u2705 ${data.metadata.title || "Paper Found"}</strong><br>
       <a href="${data.pdf_url}" target="_blank" style="color: white; text-decoration: underline;">View PDF</a>
     `;
     // Add warnings if tier is low
     if (data.confidence_tier === "LOW" && data.flags && data.flags.length > 0) {
       currentToast.className = "papertrail-toast papertrail-warning";
-      html += `<div style="font-size: 12px; margin-top: 5px;">⚠️ <strong>Warning:</strong> ${data.flags[0]}</div>`;
+      html += `<div style="font-size: 12px; margin-top: 5px;">\u26A0\uFE0F <strong>Warning:</strong> ${data.flags[0]}</div>`;
     }
   } else if (data.status === "unverified") {
     currentToast.className = "papertrail-toast papertrail-error";
-    html = `<strong>❌ Unverified Citation</strong><br>Could not find this paper in any canonical database.`;
+    html = `<strong>\u274C Unverified Citation</strong><br>Could not find this paper in any canonical database.`;
   } else {
     currentToast.className = "papertrail-toast papertrail-warning";
-    html = `<strong>⚠️ No PDF Found</strong><br>Paper exists but no free legal access was found.`;
+    html = `<strong>\u26A0\uFE0F No PDF Found</strong><br>Paper exists but no free legal access was found.`;
   }
 
   currentToast.querySelector(".papertrail-content").innerHTML = html;

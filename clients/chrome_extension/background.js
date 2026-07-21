@@ -17,6 +17,11 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       .replace(/\[\d+\]/g, "")        // Remove [1], [23]
       .replace(/\s{2,}/g, " ")        // Remove multiple spaces
       .trim();
+      
+    // Truncate to 500 characters to prevent overly long requests
+    if (cleanedText.length > 500) {
+      cleanedText = cleanedText.substring(0, 500);
+    }
 
     // 2. Tell the content script to show a Loading Toast immediately
     chrome.tabs.sendMessage(tab.id, { action: "showLoading" });
