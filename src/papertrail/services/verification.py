@@ -1,7 +1,11 @@
 import requests
 import urllib.parse
 import xml.etree.ElementTree as ET
+from cachetools import cached, TTLCache
 from src.papertrail.config.settings import Config
+
+# Initialize an in-memory cache for Stage 1 lookups (max 1000 items, expires in 24 hours)
+stage_1_cache = TTLCache(maxsize=1000, ttl=86400)
 
 # Using the email from environment configuration for Unpaywall API rate limiting
 UNPAYWALL_EMAIL = Config.UNPAYWALL_EMAIL
@@ -70,6 +74,7 @@ def check_arxiv(title: str, author: str) -> str:
         print(f"arXiv error: {e}")
     return None
 
+@cached(cache=stage_1_cache)
 def run_stage_1_verification(query: str = None, title: str = None, author: str = None) -> dict:
     """
     Queries official metadata APIs (CrossRef, OpenAlex, Unpaywall, arXiv).

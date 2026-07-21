@@ -1,4 +1,6 @@
 from flask import Flask, request, jsonify
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import logging
 from src.papertrail.services.verification import run_stage_1_verification
 from src.papertrail.services.search import run_stage_2_search
@@ -10,10 +12,19 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+# Initialize rate limiter using in-memory storage
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[Config.API_RATE_LIMIT],
+    storage_uri="memory://"
+)
+
 # Configurable threshold for Stage 2 search results loaded from env
 MIN_SCORE_THRESHOLD = Config.MIN_SCORE_THRESHOLD
 
 @app.route('/find_paper', methods=['POST'])
+@limiter.limit(Config.API_RATE_LIMIT)
 def find_paper():
     data = request.json
     
