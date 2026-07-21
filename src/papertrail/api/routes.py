@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, send_file
+from flask_cors import CORS
 import csv
 import io
 from flask_limiter import Limiter
@@ -13,6 +14,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# Security: Scope CORS exclusively to the Chrome Extension
+allowed_origin = f"chrome-extension://{Config.CHROME_EXTENSION_ID}" if Config.CHROME_EXTENSION_ID else ""
+CORS(app, resources={r"/*": {"origins": allowed_origin}})
 
 # Initialize rate limiter using in-memory storage
 limiter = Limiter(

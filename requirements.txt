@@ -9,3 +9,4 @@ black
 Flask-Limiter
 cachetools
 diskcache
+Flask-CORS

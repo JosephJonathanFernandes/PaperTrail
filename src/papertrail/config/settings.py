@@ -15,5 +15,8 @@ class Config:
     # API Rate Limit (e.g. '10/minute', '5/second')
     API_RATE_LIMIT = os.getenv("API_RATE_LIMIT", "10/minute")
     
+    # Chrome Extension ID
+    CHROME_EXTENSION_ID = os.getenv("CHROME_EXTENSION_ID", "")
+    
     # Environment settings
     DEBUG = os.getenv("FLASK_DEBUG", "False").lower() in ("true", "1", "t")

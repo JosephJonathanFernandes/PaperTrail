@@ -1,0 +1,65 @@
+.papertrail-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  min-width: 300px;
+  max-width: 400px;
+  padding: 16px;
+  border-radius: 8px;
+  color: white;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  z-index: 999999;
+  animation: slideIn 0.3s ease-out;
+}
+
+.papertrail-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.papertrail-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 0 0 10px;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+.papertrail-close:hover {
+  opacity: 1;
+}
+
+/* Colors based on state */
+.papertrail-loading { background-color: #3b82f6; } /* Blue */
+.papertrail-success { background-color: #10b981; } /* Green */
+.papertrail-warning { background-color: #f59e0b; } /* Orange */
+.papertrail-error { background-color: #ef4444; }   /* Red */
+
+/* Spinner Animation */
+.papertrail-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
