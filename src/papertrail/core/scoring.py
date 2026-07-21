@@ -85,9 +85,16 @@ def calculate_confidence(input_query: str, input_title: str, input_author: str, 
             
     if input_query and not input_title:
         # Broad free-text match
-        query_sim = fuzz.partial_ratio(input_query.lower(), api_title.lower())
-        if query_sim < 90:
-            score -= (100 - query_sim)
+        api_combined = f"{api_title} {api_authors} {api_metadata.get('year', '')}"
+        query_sim = fuzz.token_set_ratio(input_query.lower(), api_combined.lower())
+        
+        # If the user queried an arXiv ID and the API resolved it, it's a perfect match
+        arxiv_match = re.search(r'(\d{4}\.\d{4,5})', input_query)
+        if arxiv_match and api_metadata.get("doi") and arxiv_match.group(1) in api_metadata.get("doi"):
+            query_sim = 100
+            
+        if query_sim < 60:
+            score -= (100 - query_sim) * 0.5
             flags.append(f"Query match weak ({query_sim:.1f}%). Input may be hallucinated or heavily distorted.")
             
     score = max(0, min(100, int(score)))
