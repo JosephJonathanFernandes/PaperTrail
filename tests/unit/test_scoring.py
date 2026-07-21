@@ -7,9 +7,18 @@ def test_is_shadow_library_blocks_known_domains():
     assert is_shadow_library("https://annas-archive.org/md5/abc") == True
     assert is_shadow_library("https://mirror.sci-hub.se/file.pdf") == True
 
-def test_is_shadow_library_allows_legit_domains():
-    assert is_shadow_library("https://arxiv.org/pdf/1234.pdf") == False
-    assert is_shadow_library("https://researchgate.net/publication/123") == False
+def test_is_shadow_library_negative_suite():
+    # Make sure we don't overmatch on innocent domains containing bad keywords
+    safe_urls = [
+        "https://sci-hub-news.com/article",
+        "http://my-libgenious-app.io/login",
+        "https://z-lib-fans.org",
+        "https://arxiv.org/pdf/1234.pdf",
+        "https://researchgate.net/publication/123",
+        "https://nature.com/articles/s41586-020-2649-2"
+    ]
+    for url in safe_urls:
+        assert is_shadow_library(url) is False, f"Overmatched on safe URL: {url}"
 
 def test_score_candidate_hard_blocks():
     # Should return -1 for shadow libraries

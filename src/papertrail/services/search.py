@@ -55,6 +55,22 @@ def extract_linkedin_outbound_links(snippet: str) -> list:
         logger.warning(f"Failed to extract LinkedIn links: {e}")
         return []
 
+def resolve_redirect(url: str, timeout: int = 5) -> str:
+    """
+    Resolves shortlinks or sneaky redirects to their final destination.
+    Prevents shadow libraries from hiding behind bit.ly or other redirectors.
+    """
+    try:
+        res = requests.head(url, allow_redirects=True, timeout=timeout)
+        # Some servers block HEAD requests, fallback to streaming GET
+        if res.status_code >= 400:
+            res = requests.get(url, allow_redirects=True, stream=True, timeout=timeout)
+            res.close()
+        return res.url
+    except requests.RequestException as e:
+        logger.debug(f"Redirect resolution failed for {url}: {e}")
+        return url
+
 def run_stage_2_search(metadata: dict) -> list:
     """
     Handles web search fallbacks via search APIs and extracts safe outbound links.
@@ -91,8 +107,9 @@ def run_stage_2_search(metadata: dict) -> list:
             if "linkedin.com" in url.lower():
                 outbound_urls = extract_linkedin_outbound_links(snippet)
                 for out_url in outbound_urls:
+                    final_url = resolve_redirect(out_url)
                     score = score_candidate(
-                        url=out_url, 
+                        url=final_url, 
                         title=title, 
                         author_lastname=author_lastname,
                         extracted_title=extracted_title,
@@ -100,16 +117,17 @@ def run_stage_2_search(metadata: dict) -> list:
                     )
                     if score > 0:
                         candidates.append({
-                            "url": out_url,
+                            "url": final_url,
                             "score": score,
                             "source_query": q,
                             "original_source": "linkedin"
                         })
                     else:
-                        logger.debug(f"Candidate rejected (score={score}): {out_url}")
+                        logger.debug(f"Candidate rejected (score={score}): {final_url}")
             else:
+                final_url = resolve_redirect(url)
                 score = score_candidate(
-                    url=url, 
+                    url=final_url, 
                     title=title, 
                     author_lastname=author_lastname,
                     extracted_title=extracted_title,
@@ -117,13 +135,13 @@ def run_stage_2_search(metadata: dict) -> list:
                 )
                 if score > 0:
                     candidates.append({
-                        "url": url,
+                        "url": final_url,
                         "score": score,
                         "source_query": q,
                         "original_source": "search"
                     })
                 else:
-                    logger.debug(f"Candidate rejected (score={score}): {url}")
+                    logger.debug(f"Candidate rejected (score={score}): {final_url}")
                     
     # Deduplicate by URL
     seen_urls = set()
