@@ -136,6 +136,22 @@ def check_arxiv_by_id(arxiv_id: str) -> dict:
         print(f"arXiv ID error: {e}")
     return None
 
+def extract_identifiers(query: str) -> dict:
+    """Extracts explicit identifiers like arXiv IDs and DOIs from messy citation strings."""
+    ids = {}
+    if not query:
+        return ids
+        
+    arxiv_match = re.search(r'(?:arxiv:)?(\d{4}\.\d{4,5}(?:v\d+)?)', query.lower())
+    if arxiv_match:
+        ids['arxiv'] = arxiv_match.group(1)
+        
+    doi_match = re.search(r'(10\.\d{4,9}/[-._;()/:A-Z0-9]+)', query, re.I)
+    if doi_match:
+        ids['doi'] = doi_match.group(1).rstrip('.,;:')
+        
+    return ids
+
 @stage_1_cache.memoize(expire=2592000)
 def run_stage_1_verification(query: str = None, title: str = None, author: str = None) -> dict:
     """
@@ -153,21 +169,20 @@ def run_stage_1_verification(query: str = None, title: str = None, author: str =
     }
     pdf_url = None
     
-    # 0. Check if the query contains an explicit arXiv ID
-    if query:
-        arxiv_match = re.search(r'(?:arxiv:)?(\d{4}\.\d{4,5}(?:v\d+)?)', query.lower())
-        if arxiv_match:
-            arxiv_id = arxiv_match.group(1)
-            arxiv_res = check_arxiv_by_id(arxiv_id)
-            if arxiv_res:
-                verified = True
-                metadata["title"] = arxiv_res["title"]
-                metadata["year"] = arxiv_res["year"]
-                metadata["authors"] = arxiv_res["authors"]
-                metadata["doi"] = arxiv_res["doi"]
-                pdf_url = arxiv_res["open_access_pdf"]
+    # 0. Check if the query contains an explicit identifier
+    ids = extract_identifiers(query)
+    if "arxiv" in ids:
+        arxiv_res = check_arxiv_by_id(ids["arxiv"])
+        if arxiv_res:
+            verified = True
+            metadata["title"] = arxiv_res["title"]
+            metadata["year"] = arxiv_res["year"]
+            metadata["authors"] = arxiv_res["authors"]
+            metadata["doi"] = arxiv_res["doi"]
+            pdf_url = arxiv_res["open_access_pdf"]
                 
     # 1. Search Semantic Scholar First (Excellent for CS/AI, but prone to rate limits without a key)
+    s2_res = None
     if not verified:
         s2_res = search_semantic_scholar(query, title, author)
     if s2_res:

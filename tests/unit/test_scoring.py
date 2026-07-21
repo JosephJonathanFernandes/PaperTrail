@@ -1,5 +1,5 @@
 import pytest
-from src.papertrail.core.scoring import is_shadow_library, score_candidate
+from src.papertrail.core.scoring import is_shadow_library, score_candidate, calculate_confidence
 
 def test_is_shadow_library_blocks_known_domains():
     assert is_shadow_library("https://sci-hub.se/10.1234/xyz") == True
@@ -37,3 +37,49 @@ def test_score_candidate_ranking():
         author_lastname="LeCun"
     )
     assert score >= 50
+
+def test_calculate_confidence_exact_match():
+    metadata = {"title": "Attention Is All You Need", "authors": [{"family": "Vaswani"}]}
+    result = calculate_confidence(None, "Attention Is All You Need", "Vaswani", metadata)
+    assert result["score"] == 100
+    assert result["tier"] == "HIGH"
+    assert len(result["flags"]) == 0
+
+def test_calculate_confidence_author_mismatch():
+    metadata = {"title": "Attention Is All You Need", "authors": [{"family": "Vaswani"}]}
+    result = calculate_confidence(None, "Attention Is All You Need", "Smith", metadata)
+    assert result["score"] < 100
+    assert any("Author mismatch" in flag for flag in result["flags"])
+
+def test_calculate_confidence_title_drift():
+    metadata = {"title": "Attention Is All You Need", "authors": [{"family": "Vaswani"}]}
+    # A slightly off title should lower the score but not destroy it completely
+    result = calculate_confidence(None, "Attention is what you need", "Vaswani", metadata)
+    assert result["score"] < 100
+    assert result["score"] > 50
+    assert any("Title mismatch" in flag for flag in result["flags"])
+
+def test_calculate_confidence_arxiv_id_exact_match():
+    # If the user queried an arXiv ID and the API metadata confirms that ID, it should score 100%
+    query = "Layer normalization. arXiv:1607.06450"
+    metadata = {
+        "title": "Layer Normalization", 
+        "authors": [{"family": "Ba"}],
+        "doi": "10.48550/arXiv.1607.06450"
+    }
+    result = calculate_confidence(query, None, None, metadata)
+    assert result["score"] == 100
+    assert result["tier"] == "HIGH"
+
+def test_calculate_confidence_hallucination():
+    # Simulating the OpenAlex hallucination bug (querying a citation, returning ResMLP)
+    query = "Jimmy Lei Ba, Jamie Ryan Kiros. Layer normalization. arXiv preprint arXiv:1607.06450, 2016."
+    metadata = {
+        "title": "ResMLP: Feedforward Networks for Image Classification With Data-Efficient Training",
+        "authors": [{"family": "Touvron"}],
+        "doi": "10.1109/TPAMI.2022.3206148"
+    }
+    result = calculate_confidence(query, None, None, metadata)
+    assert result["score"] < 70
+    assert result["tier"] in ["LOW", "MEDIUM"]
+    assert any("hallucinated" in flag.lower() for flag in result["flags"])
