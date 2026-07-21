@@ -1,0 +1,8 @@
+flask
+requests
+rapidfuzz
+duckduckgo-search
+python-dotenv
+pytest
+flake8
+black

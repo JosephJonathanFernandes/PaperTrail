@@ -1,6 +1,6 @@
 # PaperTrail 📚
 
-![CI Pipeline](https://github.com/yourusername/papertrail/actions/workflows/ci.yml/badge.svg)
+![CI Pipeline](https://github.com/JosephJonathanFernandes/PaperTrail/actions/workflows/ci.yml/badge.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 **PaperTrail** is an enterprise-grade open-source backend for verifying scholarly citations, locating legal open-access copies of papers, and combating the spread of hallucinated references and shadow libraries.
@@ -32,7 +32,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a detailed system breakdown
 ### Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/papertrail.git
+   git clone https://github.com/JosephJonathanFernandes/PaperTrail.git
    cd papertrail
    ```
 2. Create a virtual environment and install dependencies:
