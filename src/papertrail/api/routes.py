@@ -1,4 +1,6 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
+import csv
+import io
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import logging
@@ -138,6 +140,43 @@ def find_papers_batch():
             })
             
     return jsonify({"results": results}), 200
+
+@app.route('/export_batch_csv', methods=['POST'])
+@limiter.limit(Config.API_RATE_LIMIT)
+def export_batch_csv():
+    """
+    Batch endpoint that takes a list of citation strings and returns a CSV file report.
+    """
+    data = request.json
+    citations = data.get('citations', [])
+    
+    if not citations or not isinstance(citations, list):
+        return jsonify({"error": "Please provide a list of citation strings in the 'citations' field."}), 400
+        
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Citation", "Status", "Confidence Tier", "Confidence Score", "Flags", "PDF Link"])
+    
+    for citation in citations:
+        verification = run_stage_1_verification(query=citation)
+        if not verification.get('verified'):
+            writer.writerow([citation, "Unverified", "NONE", "", "Fabricated or hallucinated citation", ""])
+        else:
+            status = "Found" if verification.get("open_access_pdf") else "Not Found (Metadata verified)"
+            tier = verification.get("confidence_tier", "")
+            score = verification.get("confidence_score", "")
+            flags = "; ".join(verification.get("flags", []))
+            pdf_link = verification.get("open_access_pdf", "")
+            
+            writer.writerow([citation, status, tier, score, flags, pdf_link])
+            
+    output.seek(0)
+    return send_file(
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name='audit_report.csv'
+    )
 
 if __name__ == '__main__':
     app.run(debug=Config.DEBUG)
