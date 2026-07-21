@@ -1,6 +1,12 @@
 from src.papertrail.core.scoring import score_candidate
 import requests
 import re
+import time
+import logging
+from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
+import re
 from urllib.parse import urlparse
 
 # Using duckduckgo_search for prototyping without API keys.
@@ -10,37 +16,44 @@ try:
 except ImportError:
     DDGS = None
 
-def perform_search(query: str) -> list:
+def perform_search(query: str, retries: int = 3, backoff: int = 2) -> list:
     """
-    Performs a web search using DuckDuckGo.
+    Performs a web search using DuckDuckGo with retry and backoff logic.
     Returns a list of dicts: [{'url': '...', 'title': '...', 'snippet': '...'}]
     """
     if not DDGS:
-        print("duckduckgo_search is not installed. Please install it to enable search.")
+        logger.warning("duckduckgo_search is not installed.")
         return []
     
-    results = []
-    try:
-        with DDGS() as ddgs:
-            # max_results limits how many we fetch per query to avoid rate limits
-            for r in ddgs.text(query, max_results=5):
-                results.append({
-                    "url": r.get("href"),
-                    "title": r.get("title", ""),
-                    "snippet": r.get("body", "")
-                })
-    except Exception as e:
-        print(f"Search error for query '{query}': {e}")
-    return results
+    for attempt in range(retries):
+        results = []
+        try:
+            with DDGS() as ddgs:
+                for r in ddgs.text(query, max_results=5):
+                    results.append({
+                        "url": r.get("href"),
+                        "title": r.get("title", ""),
+                        "snippet": r.get("body", "")
+                    })
+            return results
+        except Exception as e:
+            logger.warning(f"Search attempt {attempt + 1} failed for '{query}': {e}")
+            time.sleep(backoff * (attempt + 1))
+            
+    return []
 
 def extract_linkedin_outbound_links(snippet: str) -> list:
     """
     Extracts URLs from LinkedIn post snippets.
-    Often LinkedIn snippets contain raw URLs or lnkd.in redirectors.
+    Wrapped in try/except to handle parsing fragility gracefully.
     """
-    url_pattern = re.compile(r'(https?://[^\s]+)')
-    urls = url_pattern.findall(snippet)
-    return urls
+    try:
+        url_pattern = re.compile(r'(https?://[^\s]+)')
+        urls = url_pattern.findall(snippet)
+        return urls
+    except Exception as e:
+        logger.warning(f"Failed to extract LinkedIn links: {e}")
+        return []
 
 def run_stage_2_search(metadata: dict) -> list:
     """
@@ -92,6 +105,8 @@ def run_stage_2_search(metadata: dict) -> list:
                             "source_query": q,
                             "original_source": "linkedin"
                         })
+                    else:
+                        logger.debug(f"Candidate rejected (score={score}): {out_url}")
             else:
                 score = score_candidate(
                     url=url, 
@@ -107,6 +122,8 @@ def run_stage_2_search(metadata: dict) -> list:
                         "source_query": q,
                         "original_source": "search"
                     })
+                else:
+                    logger.debug(f"Candidate rejected (score={score}): {url}")
                     
     # Deduplicate by URL
     seen_urls = set()

@@ -1,8 +1,12 @@
 from flask import Flask, request, jsonify
+import logging
 from src.papertrail.services.verification import run_stage_1_verification
 from src.papertrail.services.search import run_stage_2_search
 from src.papertrail.services.fallback import run_stage_3_fallback
 from src.papertrail.config.settings import Config
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -48,8 +52,14 @@ def find_paper():
     search_results = run_stage_2_search(verification_result['metadata'])
     
     # Filter and pick the highest scoring result that passes the threshold
-    valid_results = [r for r in search_results if r.get('score', 0) >= MIN_SCORE_THRESHOLD]
-    
+    valid_results = []
+    for r in search_results:
+        score = r.get('score', 0)
+        if score >= MIN_SCORE_THRESHOLD:
+            valid_results.append(r)
+        else:
+            logger.info(f"Rejected search candidate below threshold ({score} < {MIN_SCORE_THRESHOLD}): {r['url']}")
+            
     if valid_results:
         # Assuming search_results is already sorted by score descending in run_stage_2_search
         best_match = valid_results[0]

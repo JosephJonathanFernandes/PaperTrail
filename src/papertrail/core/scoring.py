@@ -1,7 +1,7 @@
 import re
 from urllib.parse import urlparse
 from rapidfuzz import fuzz
-from src.papertrail.core.blocklist import SHADOW_LIBRARY_DOMAINS
+from src.papertrail.core.blocklist import SHADOW_LIBRARY_DOMAINS, SHADOW_LIBRARY_PATTERNS
 
 def is_shadow_library(url: str) -> bool:
     """
@@ -18,6 +18,9 @@ def is_shadow_library(url: str) -> bool:
             sub_domain = '.'.join(parts[i:])
             if sub_domain in SHADOW_LIBRARY_DOMAINS:
                 return True
+            for pattern in SHADOW_LIBRARY_PATTERNS:
+                if pattern.match(sub_domain):
+                    return True
         return False
     except Exception:
         # If URL parsing fails, fail-safe by blocking it

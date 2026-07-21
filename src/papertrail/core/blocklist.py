@@ -1,6 +1,14 @@
+import re
+
+# Exact matches for speed and known weird domains
 SHADOW_LIBRARY_DOMAINS = {
-    'sci-hub.se', 'sci-hub.st', 'sci-hub.ru', 'sci-hub.do', 
-    'libgen.rs', 'libgen.is', 'libgen.st', 'libgen.li',
-    'z-lib.org', 'z-lib.io', 'b-ok.cc', 'bookfi.net',
-    'annas-archive.org'
+    'b-ok.cc', 'bookfi.net', 'annas-archive.org'
 }
+
+# Regex patterns for domains that constantly rotate TLDs
+SHADOW_LIBRARY_PATTERNS = [
+    re.compile(r'^sci-hub\.[a-z]+$'),
+    re.compile(r'^mirror\.sci-hub\.[a-z]+$'),
+    re.compile(r'^libgen\.[a-z]+$'),
+    re.compile(r'^z-lib\.[a-z]+$')
+]
