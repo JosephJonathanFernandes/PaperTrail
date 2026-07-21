@@ -61,3 +61,46 @@ def score_candidate(url: str, title: str, author_lastname: str, extracted_title:
         score += 15
         
     return score
+
+def calculate_confidence(input_query: str, input_title: str, input_author: str, api_metadata: dict) -> dict:
+    """
+    Compares the user's input against the API metadata to generate a confidence score and flags.
+    """
+    score = 100
+    flags = []
+    
+    api_title = api_metadata.get("title", "")
+    api_authors = " ".join([a.get("family", "") for a in api_metadata.get("authors", [])])
+    
+    if input_title and api_title:
+        title_sim = fuzz.ratio(input_title.lower(), api_title.lower())
+        if title_sim < 95:
+            score -= (100 - title_sim) * 0.5
+            flags.append(f"Title mismatch ({title_sim:.1f}% similarity). Expected: '{input_title}', Found: '{api_title}'")
+            
+    if input_author and api_authors:
+        if input_author.lower() not in api_authors.lower():
+            score -= 20
+            flags.append(f"Author mismatch. '{input_author}' not found in canonical author list.")
+            
+    if input_query and not input_title:
+        # Broad free-text match
+        query_sim = fuzz.partial_ratio(input_query.lower(), api_title.lower())
+        if query_sim < 90:
+            score -= (100 - query_sim)
+            flags.append(f"Query match weak ({query_sim:.1f}%). Input may be hallucinated or heavily distorted.")
+            
+    score = max(0, min(100, int(score)))
+    
+    if score >= 90:
+        tier = "HIGH"
+    elif score >= 70:
+        tier = "MEDIUM"
+    else:
+        tier = "LOW"
+        
+    return {
+        "score": score,
+        "tier": tier,
+        "flags": flags
+    }

@@ -45,15 +45,19 @@ def find_paper():
     if not verification_result.get('verified'):
         return jsonify({
             "status": "unverified",
-            "message": "Unverified/possibly fabricated citation."
+            "message": "Unverified/possibly fabricated citation.",
+            "confidence_tier": "NONE"
         }), 404
         
-    if verification_result.get('pdf_url'):
+    if verification_result.get('open_access_pdf'):
         return jsonify({
             "status": "success",
             "source": "api",
-            "pdf_url": verification_result['pdf_url'],
-            "metadata": verification_result['metadata']
+            "pdf_url": verification_result['open_access_pdf'],
+            "metadata": verification_result['metadata'],
+            "confidence_score": verification_result['confidence_score'],
+            "confidence_tier": verification_result['confidence_tier'],
+            "flags": verification_result['flags']
         }), 200
         
     # ==========================================
@@ -79,7 +83,9 @@ def find_paper():
             "source": "search",
             "pdf_url": best_match['url'],
             "metadata": verification_result['metadata'],
-            "score": best_match['score']
+            "confidence_score": verification_result['confidence_score'],
+            "confidence_tier": "LOW",
+            "flags": verification_result['flags'] + ["Sourced via web search, not canonical API."]
         }), 200
         
     # ==========================================
@@ -92,8 +98,46 @@ def find_paper():
         "status": "not_found",
         "message": "No free legal PDF found.",
         "metadata": verification_result['metadata'],
-        "fallback_options": fallback_options
+        "fallback_options": fallback_options,
+        "confidence_score": verification_result['confidence_score'],
+        "confidence_tier": "FALLBACK",
+        "flags": verification_result['flags']
     }), 200
+
+@app.route('/find_papers_batch', methods=['POST'])
+@limiter.limit(Config.API_RATE_LIMIT)
+def find_papers_batch():
+    """
+    Batch endpoint that takes a list of citation strings.
+    Only runs Stage 1 (API Verification) to prevent DuckDuckGo rate limiting.
+    """
+    data = request.json
+    citations = data.get('citations', [])
+    
+    if not citations or not isinstance(citations, list):
+        return jsonify({"error": "Please provide a list of citation strings in the 'citations' field."}), 400
+        
+    results = []
+    for citation in citations:
+        verification = run_stage_1_verification(query=citation)
+        if not verification.get('verified'):
+            results.append({
+                "query": citation,
+                "status": "unverified",
+                "confidence_tier": "NONE"
+            })
+        else:
+            results.append({
+                "query": citation,
+                "status": "success" if verification.get("open_access_pdf") else "not_found",
+                "pdf_url": verification.get("open_access_pdf"),
+                "confidence_score": verification.get("confidence_score"),
+                "confidence_tier": verification.get("confidence_tier"),
+                "flags": verification.get("flags"),
+                "metadata": verification.get("metadata")
+            })
+            
+    return jsonify({"results": results}), 200
 
 if __name__ == '__main__':
     app.run(debug=Config.DEBUG)
