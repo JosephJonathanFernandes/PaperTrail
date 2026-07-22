@@ -108,13 +108,47 @@ def test_run_stage_1_arxiv_id_extraction_bypass():
         body=xml_response,
         status=200
     )
-    
+    responses.add(
+        responses.GET,
+        "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=ext_id:10.48550/arXiv.1607.06450+AND+RETR:Y&format=json",
+        json={"hitCount": 0},
+        status=200
+    )
+
     result = run_stage_1_verification(query=query)
-    
+
     assert result["verified"] is True
     assert result["metadata"]["title"] == "Layer Normalization"
     assert result["open_access_pdf"] == "http://arxiv.org/pdf/1607.06450v1"
     
-    # Verify Semantic Scholar and OpenAlex were NOT called (because len(responses.calls) == 1)
-    assert len(responses.calls) == 1
+    # Verify Semantic Scholar and OpenAlex were NOT called (because len(responses.calls) == 2, Arxiv + PMC)
+    assert len(responses.calls) == 2
     assert "export.arxiv.org" in responses.calls[0].request.url
+
+@responses.activate
+def test_check_pmc_retraction_true():
+    from src.papertrail.services.verification import check_pmc_retraction
+    responses.add(
+        responses.GET,
+        "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=ext_id:10.1234/retracted+AND+RETR:Y&format=json",
+        json={"hitCount": 1},
+        status=200
+    )
+    assert check_pmc_retraction("10.1234/retracted") is True
+
+@responses.activate
+def test_check_doaj_returns_pdf():
+    from src.papertrail.services.verification import check_doaj
+    responses.add(
+        responses.GET,
+        "https://doaj.org/api/v3/search/articles/doi:10.1234/doaj",
+        json={
+            "results": [{
+                "bibjson": {
+                    "link": [{"type": "fulltext", "url": "https://example.com/doaj.pdf"}]
+                }
+            }]
+        },
+        status=200
+    )
+    assert check_doaj("10.1234/doaj") == "https://example.com/doaj.pdf"

@@ -82,8 +82,8 @@ PaperTrail queries Unpaywall, arXiv, and CORE for legal PDFs. **PMC (PubMed Cent
 ### Author Matching
 Author matching uses last-name normalization (handles "A. Vaswani" = "Ashish Vaswani"). However, **names with diacritics** (e.g. "Müller" vs "Muller"), **CJK names**, and **ambiguous single-name cases** may produce false author-mismatch flags.
 
-### Chrome Extension — PDF Viewer
-The extension **does not work inside Chrome's native PDF viewer** (`chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai`). Content scripts cannot inject into the sandboxed PDF viewer context. To verify a citation from a PDF, copy the text and verify it on any regular webpage.
+### Chrome/Edge/Brave Extension — PDF Viewer
+The extension **does not work inside Chrome's native PDF viewer** (`chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai`). Content scripts cannot inject into the sandboxed PDF viewer context. Note that Edge and Brave's native PDF viewers are untested but likely share this exact security sandbox limitation. To verify a citation from a PDF, copy the text and verify it on any regular webpage.
 
 ### DuckDuckGo Rate Limits
 Stage 2 web search and Stage 3 fallback use DuckDuckGo with no API key. DDG may throttle or block requests under heavy use. Each call has an 8-second hard timeout, but sustained bursts will hit rate limits and return empty results. Consider replacing with SerpAPI or Google Custom Search for production use.

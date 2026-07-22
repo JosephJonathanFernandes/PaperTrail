@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PaperTrail Verification</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 16px;
+            background-color: #f9fafb;
+            color: #111827;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            width: 100%;
+            max-width: 400px;
+        }
+        .status {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+        }
+        .message {
+            font-size: 0.9rem;
+            color: #4b5563;
+            margin-bottom: 16px;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+        }
+        .link {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        .success { color: #065f46; background-color: #d1fae5; border: 1px solid #34d399; }
+        .success .link { background-color: #10b981; color: white; }
+        
+        .retracted { color: #991b1b; background-color: #fee2e2; border: 1px solid #f87171; }
+        .retracted .link { background-color: #ef4444; color: white; }
+        
+        .fallback { color: #92400e; background-color: #fef3c7; border: 1px solid #fbbf24; }
+        .fallback .link { background-color: #f59e0b; color: white; }
+        
+        .error { color: #991b1b; background-color: #fee2e2; border: 1px solid #f87171; }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="container">
+        <div class="spinner" id="spinner"></div>
+        <div class="status" id="status">Verifying Citation...</div>
+        <div class="message" id="message">Please wait while we check PaperTrail.</div>
+        <a href="#" class="link" id="action-link" style="display: none;" target="_blank">View PDF</a>
+    </div>
+    <script src="pdf_result.js"></script>
+</body>
+</html>

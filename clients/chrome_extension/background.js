@@ -6,23 +6,23 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-// Chrome's native PDF viewer URL prefix — content scripts cannot inject into it.
+// Chrome's built-in PDF viewer extension ID.
+// IMPORTANT — Browser-specificity constraint:
+//   - Chrome stable: chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai (verified as of Chrome 120+)
+//   - Microsoft Edge: uses a DIFFERENT built-in PDF viewer ID (edge://pdf-viewer/)
+//   - Brave: inherits Chromium's viewer; may use the same ID but is not guaranteed
+//   - Firefox: does not apply (different extension architecture)
+//
+// This approach is Chrome-specific by design. Cross-browser support (Edge, Brave)
+// is a known gap — see test matrix B5 #103. If this ID changes in a future Chrome
+// release, the guard below will silently stop working for PDF tabs (it will fall
+// through to content-script injection, which will then fail with no visible error).
+// A more robust long-term solution: use chrome.tabs.detectLanguage or check
+// tab.url for "file://*.pdf" patterns in addition to the extension URL prefix.
 const PDF_VIEWER_ORIGIN = "chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai";
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "verify-citation") {
-
-    // Guard: Chrome's native PDF viewer doesn't support content script injection.
-    // The PDF viewer runs in a sandboxed extension context that blocks message passing.
-    if (tab.url && tab.url.startsWith(PDF_VIEWER_ORIGIN)) {
-      // Can't inject a toast — open a notification instead via badge or alert
-      chrome.action && chrome.action.setBadgeText && chrome.action.setBadgeText({ text: "PDF", tabId: tab.id });
-      console.warn(
-        "PaperTrail: Chrome's native PDF viewer doesn't support text injection. " +
-        "Please copy the citation text and verify it from any regular webpage."
-      );
-      return;
-    }
 
     // 1. Text Normalization: Clean up ragged highlighted text
     let rawText = info.selectionText;
@@ -37,6 +37,25 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     // Truncate to 500 characters to prevent overly long requests
     if (cleanedText.length > 500) {
       cleanedText = cleanedText.substring(0, 500);
+    }
+
+    // Guard: Chrome/Edge/Brave native PDF viewers don't support content script injection.
+    const isPDFViewer = tab.url && (
+      tab.url.startsWith("chrome-extension://") || 
+      tab.url.startsWith("edge://") ||
+      tab.url.toLowerCase().endsWith(".pdf")
+    );
+
+    if (isPDFViewer) {
+      // Open a popup window instead of injecting a toast
+      chrome.windows.create({
+        url: `pdf_result.html?query=${encodeURIComponent(cleanedText)}`,
+        type: "popup",
+        width: 450,
+        height: 250,
+        focused: true
+      });
+      return;
     }
 
     // 2. Tell the content script to show a Loading Toast immediately

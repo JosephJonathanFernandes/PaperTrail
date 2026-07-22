@@ -86,6 +86,37 @@ def check_openalex_by_doi(doi: str) -> dict:
         print(f"OpenAlex DOI error: {e}")
     return None
 
+def check_pmc_retraction(doi: str) -> bool:
+    """Checks if a DOI is marked as retracted in Europe PMC."""
+    url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=ext_id:{urllib.parse.quote(doi)}+AND+RETR:Y&format=json"
+    try:
+        response = session.get(url, timeout=3)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('hitCount', 0) > 0:
+                return True
+    except Exception as e:
+        print(f"PMC Retraction error: {e}")
+    return False
+
+def check_doaj(doi: str) -> str:
+    """Checks DOAJ for Open Access fulltext link."""
+    url = f"https://doaj.org/api/v3/search/articles/doi:{urllib.parse.quote(doi)}"
+    try:
+        response = session.get(url, timeout=3)
+        if response.status_code == 200:
+            data = response.json()
+            results = data.get('results', [])
+            if results:
+                bibjson = results[0].get('bibjson', {})
+                links = bibjson.get('link', [])
+                for link in links:
+                    if link.get('type') == 'fulltext':
+                        return link.get('url')
+    except Exception as e:
+        print(f"DOAJ error: {e}")
+    return None
+
 def check_unpaywall(doi: str) -> str:
     url = f"https://api.unpaywall.org/v2/{doi}?email={UNPAYWALL_EMAIL}"
     try:
@@ -308,12 +339,23 @@ def run_stage_1_verification(query: str = None, title: str = None, author: str =
         if core_pdf:
             pdf_url = core_pdf
 
+    # 5.5 Check DOAJ if we have a DOI but no PDF URL yet
+    if metadata["doi"] and not pdf_url:
+        doaj_pdf = check_doaj(metadata["doi"])
+        if doaj_pdf:
+            pdf_url = doaj_pdf
+
     # 6. Fallback check for arXiv directly
     if verified and not pdf_url and metadata["title"]:
         arxiv_pdf = check_arxiv(metadata["title"], metadata["author"])
         if arxiv_pdf:
             pdf_url = arxiv_pdf
             
+    # 7. Final Safety Check: Retractions via PMC
+    if verified and metadata["doi"] and not metadata.get("is_retracted"):
+        if check_pmc_retraction(metadata["doi"]):
+            metadata["is_retracted"] = True
+
     if not verified:
         return {"verified": False}
         

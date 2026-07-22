@@ -30,36 +30,60 @@ def _normalize_author(name: str) -> tuple:
     initial = first_token[0].lower() if first_token else ''
     return (last, initial)
 
-def _author_match(input_author: str, api_authors_str: str) -> bool:
+def _author_match(input_author: str, api_authors) -> bool:
     """
-    Returns True if input_author plausibly matches any author in api_authors_str.
-    Matching rules (in order of strictness):
-      1. Direct substring match (fast path)
-      2. Last-name match (sufficient for single-name queries like "Vaswani")
-      3. Last-name + initial match (handles "A. Vaswani" vs "Ashish Vaswani")
+    Returns True if input_author plausibly matches any author in api_authors.
+    api_authors can be a string (space/comma/semicolon delimited) or a list of strings.
     """
     inp_lower = input_author.lower()
-    api_lower = api_authors_str.lower()
-    # Fast path: direct substring
-    if inp_lower in api_lower:
-        return True
+    
+    if isinstance(api_authors, str):
+        api_lower = api_authors.lower()
+        if inp_lower in api_lower:
+            return True
+        # If it's a single string, try to infer the list
+        # If there are semicolons/pipes, use those. 
+        if ';' in api_authors or '|' in api_authors:
+            candidates = re.split(r'[;|]+', api_authors)
+        # If no semicolons, but commas exist, check if commas are just formatting (e.g., Smith, A.)
+        elif ',' in api_authors:
+            # Simple heuristic: if we split by comma and any part is just an initial, it's probably "Last, First"
+            parts = [p.strip() for p in api_authors.split(',')]
+            if any(len(p) <= 2 and p.endswith('.') for p in parts):
+                candidates = [api_authors] # treat as single author
+            else:
+                candidates = parts
+        else:
+            tokens = api_authors.split()
+            # Guard: only split by space if there are no periods (no initials).
+            # Otherwise, treat the whole string as a single candidate to avoid 
+            # breaking "A. Smith" into ["A.", "Smith"] and matching "B. Smith".
+            if all('.' not in t for t in tokens):
+                candidates = tokens
+            else:
+                candidates = [api_authors]
+    else:
+        candidates = api_authors
+        
     inp_last, inp_initial = _normalize_author(input_author)
-    # Match against each token-cluster in api_authors (split on comma/space)
-    # Build list of candidate author names from the API string
-    # The api_authors_str is a space-joined "family" field from various APIs
-    for candidate in re.split(r'[,;|]+', api_authors_str):
-        candidate = candidate.strip()
+
+    for candidate in candidates:
+        candidate = str(candidate).strip()
         if not candidate:
             continue
+            
         cand_last, cand_initial = _normalize_author(candidate)
         if cand_last == inp_last:
-            # Last name matches — if we have initials for both, check them too
             if inp_initial and cand_initial:
                 if inp_initial == cand_initial:
                     return True
             else:
-                # One or both sides have no initial — last name alone is sufficient
                 return True
+                
+        # Also check if candidate is just the last name
+        if candidate.lower() == inp_last:
+            return True
+
     return False
 
 def is_shadow_library(url: str) -> bool:
