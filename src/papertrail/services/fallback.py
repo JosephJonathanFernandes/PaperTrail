@@ -3,27 +3,36 @@ try:
 except ImportError:
     DDGS = None
 
+import logging
+from src.papertrail.services.search import _ddg_search_with_timeout
+
+logger = logging.getLogger(__name__)
+
 def get_researchgate_link(title: str, author_lastname: str) -> str:
     """
-    Searches for the specific paper's ResearchGate publication page, 
+    Searches for the specific paper's ResearchGate publication page,
     which usually features a 'Request full-text' button.
+    Uses the shared DDG timeout wrapper to prevent worker hangs.
     """
     if not DDGS or not title:
         return None
     query = f'"{title}" {author_lastname} site:researchgate.net'
     try:
-        with DDGS() as ddgs:
-            for r in ddgs.text(query, max_results=3):
-                url = r.get("href", "")
-                if "researchgate.net/publication/" in url:
-                    return url
+        results = _ddg_search_with_timeout(query, timeout=8)
+        for r in results:
+            url = r.get("url", "")
+            if "researchgate.net/publication/" in url:
+                return url
     except Exception as e:
-        print(f"RG Fallback Search error: {e}")
+        logger.warning(f"RG Fallback Search error: {e}")
     return None
 
 def get_author_contact_page(author: str) -> str:
     """
     Attempts to find a faculty or contact page for the author.
+    Uses the shared DDG timeout wrapper to prevent worker hangs.
+    Note: Only searches publicly indexed .edu/.ac.uk pages via DuckDuckGo.
+    Does NOT scrape ResearchGate or LinkedIn author profiles.
     """
     if not DDGS or not author:
         return None
@@ -31,12 +40,11 @@ def get_author_contact_page(author: str) -> str:
     # A generic search for the author's faculty/contact page on academic domains
     query = f'"{author}" faculty OR contact OR email site:.edu OR site:.ac.uk'
     try:
-        with DDGS() as ddgs:
-            for r in ddgs.text(query, max_results=3):
-                # Return the first highly relevant result
-                return r.get("href")
+        results = _ddg_search_with_timeout(query, timeout=8)
+        if results:
+            return results[0].get("url")
     except Exception as e:
-        print(f"Author Search error: {e}")
+        logger.warning(f"Author Search error: {e}")
     return None
 
 def run_stage_3_fallback(metadata: dict) -> dict:

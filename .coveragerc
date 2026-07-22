@@ -1,0 +1,14 @@
+[run]
+source = src/papertrail
+omit =
+    */tests/*
+    */test_*
+    */__pycache__/*
+
+[report]
+show_missing = true
+skip_covered = false
+precision = 1
+
+[html]
+directory = htmlcov

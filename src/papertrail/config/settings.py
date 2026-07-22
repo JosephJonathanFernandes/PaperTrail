@@ -18,5 +18,9 @@ class Config:
     # Chrome Extension ID
     CHROME_EXTENSION_ID = os.getenv("CHROME_EXTENSION_ID", "")
     
+    # CORE API key (optional — raises rate limit from 10 req/min to higher tier)
+    # Register free at: https://core.ac.uk/services/api
+    CORE_API_KEY = os.getenv("CORE_API_KEY", "")
+    
     # Environment settings
     DEBUG = os.getenv("FLASK_DEBUG", "False").lower() in ("true", "1", "t")

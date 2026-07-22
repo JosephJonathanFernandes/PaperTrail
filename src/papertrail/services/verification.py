@@ -13,6 +13,7 @@ stage_1_cache = diskcache.Cache(".cache")
 
 # Using the email from environment configuration for Unpaywall API rate limiting
 UNPAYWALL_EMAIL = Config.UNPAYWALL_EMAIL
+CORE_API_KEY = Config.CORE_API_KEY
 
 # Configure a resilient HTTP session with retries for transient network errors
 session = requests.Session()
@@ -95,8 +96,53 @@ def check_unpaywall(doi: str) -> str:
                 best_oa_location = data.get('best_oa_location')
                 if best_oa_location and best_oa_location.get('url_for_pdf'):
                     return best_oa_location['url_for_pdf']
+                # Also try url (HTML landing) if no direct pdf url available
+                if best_oa_location and best_oa_location.get('url'):
+                    return best_oa_location['url']
     except Exception as e:
         print(f"Unpaywall error: {e}")
+    return None
+
+def check_core(title: str, doi: str = None) -> str:
+    """
+    Queries the CORE API (https://core.ac.uk/services/api) for open-access PDFs.
+    CORE aggregates 230M+ papers from repositories that Unpaywall sometimes misses.
+    Works without an API key (rate-limited) or with CORE_API_KEY for higher limits.
+    Returns a direct PDF URL or None.
+    """
+    headers = {}
+    if CORE_API_KEY:
+        headers["Authorization"] = f"Bearer {CORE_API_KEY}"
+
+    # Prefer DOI lookup — most precise
+    if doi:
+        url = f"https://api.core.ac.uk/v3/works?q=doi:{urllib.parse.quote(doi)}&limit=1"
+        try:
+            response = session.get(url, headers=headers, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                results = data.get('results', [])
+                if results:
+                    pdf = results[0].get('downloadUrl') or results[0].get('fullTextIdentifier')
+                    if pdf and pdf.startswith('http'):
+                        return pdf
+        except Exception as e:
+            print(f"CORE DOI lookup error: {e}")
+
+    # Fall back to title search
+    if title:
+        url = f"https://api.core.ac.uk/v3/works?q={urllib.parse.quote(title)}&limit=1"
+        try:
+            response = session.get(url, headers=headers, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                results = data.get('results', [])
+                if results:
+                    pdf = results[0].get('downloadUrl') or results[0].get('fullTextIdentifier')
+                    if pdf and pdf.startswith('http'):
+                        return pdf
+        except Exception as e:
+            print(f"CORE title search error: {e}")
     return None
 
 def check_arxiv(title: str, author: str) -> str:
@@ -255,8 +301,14 @@ def run_stage_1_verification(query: str = None, title: str = None, author: str =
         unpaywall_pdf = check_unpaywall(metadata["doi"])
         if unpaywall_pdf:
             pdf_url = unpaywall_pdf
-            
-    # 5. Fallback check for arXiv directly
+
+    # 5. Check CORE — aggregates repositories Unpaywall sometimes misses
+    if not pdf_url:
+        core_pdf = check_core(metadata["title"] or title, doi=metadata.get("doi"))
+        if core_pdf:
+            pdf_url = core_pdf
+
+    # 6. Fallback check for arXiv directly
     if verified and not pdf_url and metadata["title"]:
         arxiv_pdf = check_arxiv(metadata["title"], metadata["author"])
         if arxiv_pdf:

@@ -74,8 +74,25 @@ function updateToastWithResult(data) {
   }
 }
 
-function updateToastWithError(error) {
+function updateToastWithError(errorType) {
   if (!currentToast) injectToast("", "error");
   currentToast.className = "papertrail-toast papertrail-error";
-  currentToast.querySelector(".papertrail-content").innerHTML = `<strong>Backend Error</strong><br>Is your local Flask server running?<br><small>${error}</small>`;
+  
+  let message;
+  if (errorType === "connection_refused") {
+    message = `
+      <strong>⚠️ PaperTrail server not running</strong><br>
+      Start the Flask backend first:<br>
+      <code style="font-size:11px; background:rgba(0,0,0,0.2); padding:2px 5px; border-radius:3px;">
+        python -m src.papertrail.api.routes
+      </code>
+    `;
+  } else if (errorType === "timeout") {
+    message = `<strong>⏱ Request timed out</strong><br>The backend took too long to respond. Check if it's under load.`;
+  } else {
+    message = `<strong>Backend Error</strong><br>Is your local Flask server running?<br><small>${errorType}</small>`;
+  }
+  
+  currentToast.querySelector(".papertrail-content").innerHTML = message;
+  setTimeout(() => { if (currentToast) currentToast.remove(); }, 15000);
 }

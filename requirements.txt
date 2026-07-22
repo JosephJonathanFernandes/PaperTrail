@@ -4,6 +4,7 @@ rapidfuzz
 duckduckgo-search
 python-dotenv
 pytest
+pytest-cov
 responses
 flake8
 black

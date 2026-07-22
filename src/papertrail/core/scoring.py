@@ -3,6 +3,65 @@ from urllib.parse import urlparse
 from rapidfuzz import fuzz
 from src.papertrail.core.blocklist import SHADOW_LIBRARY_DOMAINS, SHADOW_LIBRARY_PATTERNS
 
+def _normalize_author(name: str) -> tuple:
+    """
+    Normalizes an author name into (last_name, first_initial) for comparison.
+    Handles formats like:
+      - "Ashish Vaswani"  → ("vaswani", "a")
+      - "Vaswani, A."     → ("vaswani", "a")
+      - "A. Vaswani"      → ("vaswani", "a")
+      - "Vaswani"         → ("vaswani", "")
+    Returns (last_name_lower, first_initial_lower).
+    """
+    name = name.strip().rstrip('.')
+    # Format: "Last, First" or "Last, F."
+    if ',' in name:
+        parts = [p.strip() for p in name.split(',', 1)]
+        last = parts[0].lower()
+        first = parts[1].strip().lstrip('.').strip() if len(parts) > 1 else ''
+        initial = first[0].lower() if first else ''
+        return (last, initial)
+    # Format: "First Last" or "F. Last"
+    tokens = name.split()
+    if len(tokens) == 1:
+        return (tokens[0].lower(), '')
+    last = tokens[-1].lower()
+    first_token = tokens[0].rstrip('.')
+    initial = first_token[0].lower() if first_token else ''
+    return (last, initial)
+
+def _author_match(input_author: str, api_authors_str: str) -> bool:
+    """
+    Returns True if input_author plausibly matches any author in api_authors_str.
+    Matching rules (in order of strictness):
+      1. Direct substring match (fast path)
+      2. Last-name match (sufficient for single-name queries like "Vaswani")
+      3. Last-name + initial match (handles "A. Vaswani" vs "Ashish Vaswani")
+    """
+    inp_lower = input_author.lower()
+    api_lower = api_authors_str.lower()
+    # Fast path: direct substring
+    if inp_lower in api_lower:
+        return True
+    inp_last, inp_initial = _normalize_author(input_author)
+    # Match against each token-cluster in api_authors (split on comma/space)
+    # Build list of candidate author names from the API string
+    # The api_authors_str is a space-joined "family" field from various APIs
+    for candidate in re.split(r'[,;|]+', api_authors_str):
+        candidate = candidate.strip()
+        if not candidate:
+            continue
+        cand_last, cand_initial = _normalize_author(candidate)
+        if cand_last == inp_last:
+            # Last name matches — if we have initials for both, check them too
+            if inp_initial and cand_initial:
+                if inp_initial == cand_initial:
+                    return True
+            else:
+                # One or both sides have no initial — last name alone is sufficient
+                return True
+    return False
+
 def is_shadow_library(url: str) -> bool:
     """
     Checks if a given URL belongs to a known shadow library domain.
@@ -84,7 +143,7 @@ def calculate_confidence(input_query: str, input_title: str, input_author: str, 
             flags.append(f"Title mismatch ({title_sim:.1f}% similarity). Expected: '{input_title}', Found: '{api_title}'")
             
     if input_author and api_authors:
-        if input_author.lower() not in api_authors.lower():
+        if not _author_match(input_author, api_authors):
             score -= 20
             flags.append(f"Author mismatch. '{input_author}' not found in canonical author list.")
             
