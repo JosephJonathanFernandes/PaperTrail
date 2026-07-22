@@ -15,8 +15,16 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Security: Scope CORS exclusively to the Chrome Extension
-allowed_origin = f"chrome-extension://{Config.CHROME_EXTENSION_ID}" if Config.CHROME_EXTENSION_ID else ""
+# Security: Scope CORS exclusively to the Chrome Extension.
+# If CHROME_EXTENSION_ID is not set, fail closed: reject all cross-origin requests.
+if Config.CHROME_EXTENSION_ID:
+    allowed_origin = f"chrome-extension://{Config.CHROME_EXTENSION_ID}"
+else:
+    allowed_origin = None  # Flask-CORS with origins=None → rejects all cross-origin requests
+    logger.warning(
+        "CHROME_EXTENSION_ID is not set. CORS is disabled — all cross-origin requests will be rejected. "
+        "Set CHROME_EXTENSION_ID in your .env file to enable the Chrome extension."
+    )
 CORS(app, resources={r"/*": {"origins": allowed_origin}})
 
 # Initialize rate limiter using in-memory storage

@@ -4,9 +4,9 @@ rapidfuzz
 duckduckgo-search
 python-dotenv
 pytest
+responses
 flake8
 black
 Flask-Limiter
-cachetools
 diskcache
 Flask-CORS

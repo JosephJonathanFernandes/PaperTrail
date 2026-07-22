@@ -65,13 +65,40 @@ def test_24_preprint_later_published_under_a_slightly_different_final():
 
 @responses.activate
 def test_25_retracted_paper():
-    responses.add(responses.GET, "https://api.semanticscholar.org/graph/v1/paper/search", json={"data": [{"title": "Ileal-lymphoid-nodular hyperplasia", "year": 1998, "isRetracted": True, "authors": [{"name": "Wakefield"}]}]}, status=200, match_querystring=False)
-    res = run_stage_1_verification(title="Ileal-lymphoid-nodular hyperplasia, non-specific colitis, and pervasive developmental disorder in children")
-    if res.get("verified"):
-        flags_str = " ".join(res.get("flags", [])).lower()
-        assert "retract" in flags_str, "Retraction gap assertion"
-        assert res.get("confidence_score") == 0
-        assert res.get("confidence_tier") == "LOW"
+    """
+    Tests retraction detection via the OpenAlex DOI-lookup path, which is the
+    ONLY path that currently returns retraction data in production.
+    
+    Background: Semantic Scholar's isRetracted field was removed from the
+    unauthenticated search API (returns 400 with that field). The DOI-based
+    OpenAlex lookup (check_openalex_by_doi) is the reliable retraction source.
+    """
+    # Simulate: query contains a DOI for the Wakefield 1998 retracted MMR paper
+    query = "Wakefield et al. Ileal-lymphoid-nodular hyperplasia https://doi.org/10.1016/S0140-6736(97)11096-0"
+    
+    # OpenAlex DOI lookup returns is_retracted=True
+    responses.add(
+        responses.GET,
+        "https://api.openalex.org/works/https://doi.org/10.1016/S0140-6736(97)11096-0",
+        json={
+            "title": "Ileal-lymphoid-nodular hyperplasia, non-specific colitis, and pervasive developmental disorder in children",
+            "doi": "https://doi.org/10.1016/S0140-6736(97)11096-0",
+            "publication_year": 1998,
+            "is_retracted": True,
+            "authorships": [{"author": {"display_name": "Andrew Wakefield"}}],
+            "open_access": {"is_oa": False, "oa_url": None}
+        },
+        status=200
+    )
+    
+    res = run_stage_1_verification(query=query)
+    
+    assert res["verified"] is True, "Paper should be verified (it exists — just retracted)"
+    assert res["metadata"]["is_retracted"] is True, "is_retracted must be True"
+    assert res["confidence_score"] == 0, "Retracted papers must score 0"
+    assert res["confidence_tier"] == "LOW", "Retracted papers must be LOW tier"
+    flags_str = " ".join(res.get("flags", [])).lower()
+    assert "retract" in flags_str, f"Expected retraction warning in flags, got: {res.get('flags')}"
 
 @responses.activate
 def test_26_title_with_correct_doi_embedded_in_the_string():
